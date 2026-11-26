@@ -349,13 +349,28 @@
         saveHandle: null,
         saveInProgress: false,
         saveAgain: false,
+        loadInProgress: false,
+        lastRemoteVersion: null,
+        visibilityHandler: null,
 
         init() {
+          // Pierwszy odczyt uruchamiamy od razu. Po jego zakończeniu rozpoczyna się polling.
           this.loadData(false).finally(() => { this.dataReady = true; });
+
+          // Stały interwał 10 s. Blokada loadInProgress zapobiega nakładaniu się żądań.
           this.pollHandle = setInterval(() => {
-            // Strona kibica pobiera wspólne dane automatycznie co 10 sekund.
-            if (!this.isAdmin && this.dataReady && document.visibilityState === 'visible') this.loadData(true);
+            if (!this.isAdmin && this.dataReady && document.visibilityState === 'visible' && !this.loadInProgress) {
+              this.loadData(true);
+            }
           }, 10000);
+
+          // Po powrocie użytkownika do karty sprawdzamy dane od razu, bez czekania na kolejny interwał.
+          this.visibilityHandler = () => {
+            if (document.visibilityState === 'visible' && this.dataReady && !this.isAdmin && !this.loadInProgress) {
+              this.loadData(true);
+            }
+          };
+          document.addEventListener('visibilitychange', this.visibilityHandler);
         },
 
         get groupPlan() {
@@ -887,8 +902,24 @@
         },
 
         async loadData(silent = false) {
+          // Nigdy nie uruchamiamy równolegle kilku pobrań tego samego pliku.
+          if (this.loadInProgress) return;
+          this.loadInProgress = true;
+
+          const controller = new AbortController();
+          const timeoutHandle = setTimeout(() => controller.abort(), 8000);
+
           try {
-            const response = await fetch(`${GIST_RAW_URL}?v=${Date.now()}`, { method: 'GET', cache: 'no-store' });
+            // Losowy parametr ogranicza ryzyko użycia starej odpowiedzi z cache pośredniego.
+            // cache: 'no-store' wyłącza cache przeglądarki.
+            const cacheBuster = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            const response = await fetch(`${GIST_RAW_URL}?cacheBust=${cacheBuster}`, {
+              method: 'GET',
+              cache: 'no-store',
+              signal: controller.signal,
+              headers: { 'Accept': 'application/json, text/plain, */*' }
+            });
+
             if (response.status === 404) {
               this.dataMissing = true;
               this.players = [];
@@ -896,21 +927,39 @@
               this.groupMatches = [];
               this.knockoutRounds = [];
               this.qualifiersAtDraw = [];
+              this.lastRemoteVersion = null;
               this.syncMessage = 'Nowy turniej – oczekuje na pierwszy zapis';
               this.syncColor = '#f59e0b';
               return;
             }
+
             if (!response.ok) throw new Error(`HTTP ${response.status} przy pobieraniu danych Gist`);
+
             const data = await response.json();
-            if (data.tournamentType !== 'darts') throw new Error('Plik Gist zawiera dane innego turnieju lub nieprawidłowy format.');
-            this.applyData(data);
+            if (data.tournamentType !== 'table-tennis') throw new Error('Plik Gist zawiera dane innego turnieju lub nieprawidłowy format.');
+
+            // Nie przebudowujemy widoku, jeśli serwer zwrócił tę samą wersję danych.
+            const remoteVersion = `${data.updatedAt || ''}:${JSON.stringify(data)}`;
+            if (remoteVersion !== this.lastRemoteVersion) {
+              this.applyData(data);
+              this.lastRemoteVersion = remoteVersion;
+            }
+
             this.dataMissing = false;
-            this.syncMessage = 'Dane aktualne';
-            this.syncColor = '#22c55e';
+            const checkedAt = new Date().toLocaleTimeString('pl-PL');
+            const savedAt = data.updatedAt ? new Date(data.updatedAt).toLocaleTimeString('pl-PL') : 'brak znacznika';
+            this.syncMessage = `Sprawdzono ${checkedAt} · zapis ${savedAt}`;
+            this.syncColor = '#10b981';
           } catch (error) {
-            this.syncMessage = `Błąd pobierania: ${error.message || 'sprawdź połączenie'}`;
+            const message = controller.signal.aborted
+              ? 'przekroczono limit czasu pobierania (8 s)'
+              : (error.message || 'sprawdź połączenie');
+            this.syncMessage = `Błąd pobierania: ${message}`;
             this.syncColor = '#f43f5e';
             if (!silent) console.error('Błąd pobierania danych turnieju:', error);
+          } finally {
+            clearTimeout(timeoutHandle);
+            this.loadInProgress = false;
           }
         },
 
