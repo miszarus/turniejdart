@@ -936,7 +936,7 @@
             if (!response.ok) throw new Error(`HTTP ${response.status} przy pobieraniu danych Gist`);
 
             const data = await response.json();
-            if (data.tournamentType !== 'table-tennis') throw new Error('Plik Gist zawiera dane innego turnieju lub nieprawidłowy format.');
+            if (data.tournamentType !== 'darts') throw new Error('Plik Gist zawiera dane innego turnieju lub nieprawidłowy format.');
 
             // Nie przebudowujemy widoku, jeśli serwer zwrócił tę samą wersję danych.
             const remoteVersion = `${data.updatedAt || ''}:${JSON.stringify(data)}`;
