@@ -12,7 +12,7 @@
     html { -webkit-text-size-adjust: 100%; }
     body { overflow-x: hidden; }
     button, input, select { min-height: 40px; }
-    .set-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.5rem; }
+    .set-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(88px,1fr)); gap:.5rem; }
     .set-grid-five { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:.5rem; }
     .set-tile { min-width:0; border:1px solid #e5e7eb; border-radius:.75rem; padding:.5rem; background:#f9fafb; }
     .set-score { width:100%; min-width:0; text-align:center; border:1px solid #d1d5db; border-radius:.5rem; padding:.4rem .25rem; font-weight:700; background:white; }
@@ -106,7 +106,7 @@
       </div>
       <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
         <div class="text-xs uppercase tracking-wide text-slate-500 font-bold">Format</div>
-        <div class="text-2xl sm:text-3xl font-black text-slate-900 mt-1" x-text="players.length > 18 ? 'Puchar' : (groups.length ? groups.length + ' grupy' : 'Grupy')"></div>
+        <div class="text-2xl sm:text-3xl font-black text-slate-900 mt-1" x-text="isDirectKnockout ? 'Puchar' : (groups.length ? groups.length + ' grupy' : 'Grupy')"></div>
       </div>
       <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
         <div class="text-xs uppercase tracking-wide text-slate-500 font-bold">Mecze zakończone</div>
@@ -122,13 +122,57 @@
     <section class="bg-red-950 text-white rounded-2xl p-5 sm:p-6 shadow-md">
       <h2 class="text-lg font-extrabold">Zasady rozgrywek</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4 text-sm">
-        <div class="bg-white/10 rounded-xl p-3"><div class="text-red-200 text-xs uppercase font-bold">Do 18 zawodników</div><strong class="block text-lg mt-1">Grupy po 4–6 osób</strong><span class="text-red-100">Losowanie automatyczne</span></div>
-        <div class="bg-white/10 rounded-xl p-3"><div class="text-red-200 text-xs uppercase font-bold">Powyżej 18</div><strong class="block text-lg mt-1">Od razu drabinka</strong><span class="text-red-100">Bez fazy grupowej</span></div>
-        <div class="bg-white/10 rounded-xl p-3"><div class="text-red-200 text-xs uppercase font-bold">Każdy mecz</div><strong class="block text-lg mt-1">Do 2 wygranych setów</strong><span class="text-red-100">Maksymalnie 3 sety</span></div>
-        <div class="bg-white/10 rounded-xl p-3"><div class="text-red-200 text-xs uppercase font-bold">Nieparzysta liczba</div><strong class="block text-lg mt-1">Wolne losy</strong><span class="text-red-100">Drabinka dopełniana automatycznie</span></div>
+        <div class="bg-white/10 rounded-xl p-3"><div class="text-red-200 text-xs uppercase font-bold">Faza grupowa</div><strong class="block text-lg mt-1" x-text="'Do ' + (settings.knockoutThreshold - 1) + ' zawodników' "></strong><span class="text-red-100">Grupy po 4–6 osób</span></div>
+        <div class="bg-white/10 rounded-xl p-3"><div class="text-red-200 text-xs uppercase font-bold">Faza pucharowa</div><strong class="block text-lg mt-1" x-text="'Od ' + settings.knockoutThreshold + ' zawodników'"></strong><span class="text-red-100">Bezpośrednia drabinka</span></div>
+        <div class="bg-white/10 rounded-xl p-3"><div class="text-red-200 text-xs uppercase font-bold">Mecze grupowe</div><strong class="block text-lg mt-1" x-text="groupSetLabel + ' – do ' + groupWinsNeeded + ' wygranych'"></strong><span class="text-red-100">Ustawienie turnieju</span></div>
+        <div class="bg-white/10 rounded-xl p-3"><div class="text-red-200 text-xs uppercase font-bold">Mecze pucharowe</div><strong class="block text-lg mt-1" x-text="knockoutSetLabel + ' – do ' + knockoutWinsNeeded + ' wygranych'"></strong><span class="text-red-100">Wolne losy przy niepełnej drabince</span></div>
       </div>
-      <p class="text-xs text-red-100 mt-4">Do 18 osób: z każdej grupy awansuje dwóch najlepszych zawodników. Powyżej 18 osób wszyscy trafiają do drabinki pucharowej. Mecz jest rozstrzygany po zdobyciu dwóch wygranych setów.</p>
+      <p class="text-xs text-red-100 mt-4" x-text="'Przy liczbie zawodników poniżej progu z każdej grupy awansuje dwóch najlepszych. Od ' + settings.knockoutThreshold + ' zawodników wszyscy trafiają bezpośrednio do drabinki pucharowej.'"></p>
       <p class="text-xs text-red-100 mt-2">System zapisuje zwycięzcę każdego seta. Nie oblicza punktacji 501 ani zakończenia lega przez double-out.</p>
+    </section>
+
+    <!-- Ustawienia turnieju -->
+    <section x-show="isAdmin" class="bg-white rounded-2xl shadow-sm border border-red-200 p-5 sm:p-6" x-cloak>
+      <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-2 mb-4">
+        <div>
+          <h2 class="text-xl font-extrabold text-slate-900">Ustawienia turnieju</h2>
+          <p class="text-sm text-slate-500 mt-1">Zmień próg fazy pucharowej oraz liczbę setów w obu fazach.</p>
+        </div>
+        <span class="text-xs font-bold rounded-full px-3 py-1 bg-red-100 text-red-800 w-fit">Tylko administrator</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <label class="block">
+          <span class="block text-sm font-bold text-slate-700 mb-1">Faza pucharowa od ilu zawodników?</span>
+          <input type="number" min="4" max="256" step="1" x-model.number="settingsDraft.knockoutThreshold" class="w-full border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
+          <span class="block text-xs text-slate-500 mt-1">Od tej liczby turniej rozpoczyna się bezpośrednio od drabinki. Domyślnie: 19.</span>
+        </label>
+        <label class="block">
+          <span class="block text-sm font-bold text-slate-700 mb-1">Maksymalna liczba setów – grupy</span>
+          <select x-model.number="settingsDraft.groupMaxSets" class="w-full border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
+            <option value="1">1 set – do 1 wygranej</option>
+            <option value="3">3 sety – do 2 wygranych</option>
+            <option value="5">5 setów – do 3 wygranych</option>
+            <option value="7">7 setów – do 4 wygranych</option>
+            <option value="9">9 setów – do 5 wygranych</option>
+          </select>
+          <span class="block text-xs text-slate-500 mt-1">Mecz kończy się po zdobyciu większości setów.</span>
+        </label>
+        <label class="block">
+          <span class="block text-sm font-bold text-slate-700 mb-1">Maksymalna liczba setów – puchar</span>
+          <select x-model.number="settingsDraft.knockoutMaxSets" class="w-full border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-red-500 focus:outline-none">
+            <option value="1">1 set – do 1 wygranej</option>
+            <option value="3">3 sety – do 2 wygranych</option>
+            <option value="5">5 setów – do 3 wygranych</option>
+            <option value="7">7 setów – do 4 wygranych</option>
+            <option value="9">9 setów – do 5 wygranych</option>
+          </select>
+          <span class="block text-xs text-slate-500 mt-1">Ustawienie obowiązuje we wszystkich rundach pucharowych.</span>
+        </label>
+      </div>
+      <div class="mt-4 flex flex-col sm:flex-row sm:items-center gap-3">
+        <button @click="applySettings()" :disabled="!settingsDraftValid || !settingsDraftChanged" class="px-5 py-2.5 rounded-xl font-bold text-white bg-red-700 hover:bg-red-800 disabled:opacity-40 disabled:cursor-not-allowed">Zastosuj ustawienia</button>
+        <p class="text-xs text-slate-500">Po zastosowaniu kliknij „Zapisz zmiany” u góry strony, aby opublikować ustawienia dla kibiców.</p>
+      </div>
     </section>
 
     <!-- Lista uczestników -->
@@ -136,7 +180,7 @@
       <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-5">
         <div>
           <h2 class="text-xl font-extrabold text-slate-900">1. Lista zawodników</h2>
-          <p class="text-sm text-slate-500 mt-1">Wpisz imię i nazwisko każdego uczestnika. Do 18 osób system losuje grupy, powyżej 18 tworzy od razu drabinkę.</p>
+          <p class="text-sm text-slate-500 mt-1" x-text="'Wpisz imię i nazwisko każdego uczestnika. Do ' + (settings.knockoutThreshold - 1) + ' osób system losuje grupy, od ' + settings.knockoutThreshold + ' tworzy od razu drabinkę.'"></p>
         </div>
         <span x-show="isAdmin" class="text-xs font-bold rounded-full px-3 py-1 bg-red-100 text-red-800 w-fit">Tryb edycji</span>
       </div>
@@ -169,7 +213,7 @@
           <button x-show="groups.length>0 || knockoutRounds.length>0" @click="resetTournament()" class="px-4 py-2.5 rounded-xl font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200">Resetuj losowanie</button>
         </div>
       </div>
-      <p x-show="players.length===7 && players.length<=18" class="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">Przy 7 zawodnikach nie da się utworzyć grup po 4–6 osób. Dodaj ósmego zawodnika albo usuń jednego, aby rozegrać grupę 6-osobową.</p>
+      <p x-show="players.length===7 && players.length < settings.knockoutThreshold" class="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">Przy 7 zawodnikach nie da się utworzyć grup po 4–6 osób. Dodaj ósmego zawodnika albo zmień próg rozpoczęcia fazy pucharowej.</p>
     </section>
 
     <!-- Grupy i mecze -->
@@ -177,7 +221,7 @@
       <div class="flex flex-col sm:flex-row justify-between sm:items-end gap-2">
         <div>
           <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900">2. Faza grupowa</h2>
-          <p class="text-sm text-slate-500 mt-1">Każdy zawodnik rozgrywa mecz z każdym w swojej grupie. Mecz trwa maksymalnie 3 sety – wygrywa pierwszy zawodnik, który zdobędzie 2 sety.</p>
+          <p class="text-sm text-slate-500 mt-1" x-text="'Każdy zawodnik rozgrywa mecz z każdym w swojej grupie. Mecz trwa maksymalnie ' + groupMaxSets + (groupMaxSets === 1 ? ' set – wygrywa pierwszy zawodnik, który zdobędzie 1 set.' : ' setów – wygrywa pierwszy zawodnik, który zdobędzie ' + groupWinsNeeded + ' setów.')"></p>
         </div>
         <span class="text-sm font-bold text-red-700" x-text="allGroupsComplete ? 'Wszystkie grupy zakończone' : 'W trakcie rozgrywek'"></span>
       </div>
@@ -235,13 +279,13 @@
                         <div class="text-sm font-extrabold text-slate-800" x-text="getPlayerName(match.player1Id) + '  –  ' + getPlayerName(match.player2Id)"></div>
                         <div class="text-xs text-slate-500" x-text="'Mecz ' + (index+1)"></div>
                       </div>
-                      <span class="text-xs font-bold rounded-full px-3 py-1 w-fit" :class="getMatchResult(match,2).complete ? 'bg-red-100 text-red-800' : (getMatchResult(match,2).invalid ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-600')" x-text="getMatchSummary(match,2)"></span>
+                      <span class="text-xs font-bold rounded-full px-3 py-1 w-fit" :class="getMatchResult(match,groupWinsNeeded).complete ? 'bg-red-100 text-red-800' : (getMatchResult(match,groupWinsNeeded).invalid ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-600')" x-text="getMatchSummary(match,groupWinsNeeded)"></span>
                     </div>
                     <div class="set-grid">
                       <template x-for="(set,setIndex) in match.sets" :key="setIndex">
                         <div class="set-tile">
                           <div class="text-[11px] font-extrabold text-slate-500 uppercase text-center mb-2" x-text="'Set ' + (setIndex+1)"></div>
-                          <select x-model="set.winner" @change="saveData()" :disabled="!isSetEditable(match, setIndex, 2)" class="set-score text-xs sm:text-sm" :aria-label="'Zwycięzca seta ' + (setIndex+1)">
+                          <select x-model="set.winner" @change="saveData()" :disabled="!isSetEditable(match, setIndex, groupWinsNeeded)" class="set-score text-xs sm:text-sm" :aria-label="'Zwycięzca seta ' + (setIndex+1)">
                             <option value="">Nie rozegrano</option>
                             <option value="1" x-text="getPlayerName(match.player1Id)"></option>
                             <option value="2" x-text="getPlayerName(match.player2Id)"></option>
@@ -276,7 +320,7 @@
     <section x-show="knockoutRounds.length>0" class="space-y-5" x-cloak>
       <div>
         <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900" x-text="groups.length ? '4. Faza pucharowa' : '2. Bezpośrednia faza pucharowa'"></h2>
-        <p class="text-sm text-slate-500 mt-1" x-text="groups.length ? 'Awansują dwaj najlepsi zawodnicy z każdej grupy. Mecz trwa do 2 wygranych setów (maksymalnie 3).' : 'Wszyscy zawodnicy grają w drabince od pierwszej rundy. Mecz trwa do 2 wygranych setów (maksymalnie 3). Wolne losy są przydzielane automatycznie.'"></p>
+        <p class="text-sm text-slate-500 mt-1" x-text="groups.length ? ('Awansują dwaj najlepsi zawodnicy z każdej grupy. Mecz trwa do ' + knockoutWinsNeeded + ' wygranych setów (maksymalnie ' + knockoutMaxSets + ').') : ('Wszyscy zawodnicy grają w drabince od pierwszej rundy. Mecz trwa do ' + knockoutWinsNeeded + ' wygranych setów (maksymalnie ' + knockoutMaxSets + '). Wolne losy są przydzielane automatycznie.'))"></p>
       </div>
       <div class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">
         <template x-for="round in knockoutRounds" :key="round.id">
@@ -302,7 +346,7 @@
                     <template x-for="(set,setIndex) in match.sets" :key="setIndex">
                       <div class="set-tile">
                         <div class="text-[11px] font-extrabold text-slate-500 uppercase text-center mb-2" x-text="'Set ' + (setIndex+1)"></div>
-                        <select x-model="set.winner" @change="saveData()" :disabled="!isSetEditable(match, setIndex, 2)" class="set-score text-xs sm:text-sm" :aria-label="'Zwycięzca seta ' + (setIndex+1)">
+                        <select x-model="set.winner" @change="saveData()" :disabled="!isSetEditable(match, setIndex, knockoutWinsNeeded)" class="set-score text-xs sm:text-sm" :aria-label="'Zwycięzca seta ' + (setIndex+1)">
                           <option value="">Nie rozegrano</option>
                           <option value="1" x-text="getKnockoutSlotName(match.side1)"></option>
                           <option value="2" x-text="getKnockoutSlotName(match.side2)"></option>
@@ -345,6 +389,8 @@
         loginError: false,
         newPlayerName: '',
         players: [],
+        settings: { knockoutThreshold: 19, groupMaxSets: 3, knockoutMaxSets: 3 },
+        settingsDraft: { knockoutThreshold: 19, groupMaxSets: 3, knockoutMaxSets: 3 },
         groups: [],
         groupMatches: [],
         knockoutRounds: [],
@@ -390,9 +436,76 @@
           document.addEventListener('visibilitychange', this.visibilityHandler);
         },
 
+        get groupMaxSets() {
+          return Number(this.settings.groupMaxSets) || 3;
+        },
+
+        get knockoutMaxSets() {
+          return Number(this.settings.knockoutMaxSets) || 3;
+        },
+
+        get groupWinsNeeded() {
+          return Math.floor(this.groupMaxSets / 2) + 1;
+        },
+
+        get knockoutWinsNeeded() {
+          return Math.floor(this.knockoutMaxSets / 2) + 1;
+        },
+
+        get groupSetLabel() {
+          return this.groupMaxSets === 1 ? '1 set' : (this.groupMaxSets === 3 ? '3 sety' : `${this.groupMaxSets} setów`);
+        },
+
+        get knockoutSetLabel() {
+          return this.knockoutMaxSets === 1 ? '1 set' : (this.knockoutMaxSets === 3 ? '3 sety' : `${this.knockoutMaxSets} setów`);
+        },
+
+        get settingsDraftValid() {
+          const threshold = Number(this.settingsDraft.knockoutThreshold);
+          return Number.isInteger(threshold) && threshold >= 4 && threshold <= 256 &&
+            [1, 3, 5, 7, 9].includes(Number(this.settingsDraft.groupMaxSets)) &&
+            [1, 3, 5, 7, 9].includes(Number(this.settingsDraft.knockoutMaxSets));
+        },
+
+        get settingsDraftChanged() {
+          return Number(this.settingsDraft.knockoutThreshold) !== Number(this.settings.knockoutThreshold) ||
+            Number(this.settingsDraft.groupMaxSets) !== Number(this.settings.groupMaxSets) ||
+            Number(this.settingsDraft.knockoutMaxSets) !== Number(this.settings.knockoutMaxSets);
+        },
+
+        normalizeSettings(raw = {}) {
+          const allowed = [1, 3, 5, 7, 9];
+          const threshold = Number(raw.knockoutThreshold);
+          const groupMaxSets = Number(raw.groupMaxSets);
+          const knockoutMaxSets = Number(raw.knockoutMaxSets);
+          return {
+            knockoutThreshold: Number.isInteger(threshold) && threshold >= 4 && threshold <= 256 ? threshold : 19,
+            groupMaxSets: allowed.includes(groupMaxSets) ? groupMaxSets : 3,
+            knockoutMaxSets: allowed.includes(knockoutMaxSets) ? knockoutMaxSets : 3
+          };
+        },
+
+        applySettings() {
+          if (!this.isAdmin || !this.settingsDraftValid || !this.settingsDraftChanged) return;
+          const nextSettings = this.normalizeSettings(this.settingsDraft);
+          if (this.groups.length || this.knockoutRounds.length) {
+            if (!window.confirm('Zmiana ustawień unieważni obecne losowanie, drabinkę i wpisane wyniki. Lista zawodników pozostanie. Kontynuować?')) {
+              this.settingsDraft = { ...this.settings };
+              return;
+            }
+            this.clearDrawData();
+          }
+          this.settings = nextSettings;
+          this.settingsDraft = { ...nextSettings };
+          this.saveData();
+          this.syncMessage = 'Ustawienia zmienione – kliknij „Zapisz zmiany”, aby je opublikować';
+          this.syncColor = '#f59e0b';
+        },
+
         get groupPlan() {
           const count = this.players.filter(player => player.name && player.name.trim()).length;
-          if (count > 18) {
+          const threshold = this.settings.knockoutThreshold;
+          if (count >= threshold) {
             const size = 2 ** Math.ceil(Math.log2(count));
             const byes = size - count;
             return { valid: true, mode: 'knockout', sizes: [], message: `${count} zawodników – bezpośrednia drabinka pucharowa${byes ? ` z ${byes} wolnymi losami` : ''}.` };
@@ -417,15 +530,15 @@
         },
 
         get completedGroupMatches() {
-          return this.groupMatches.filter(match => this.getMatchResult(match, 2).complete).length;
+          return this.groupMatches.filter(match => this.getMatchResult(match, this.groupWinsNeeded).complete).length;
         },
 
         get isDirectKnockout() {
-          return this.players.filter(player => player.name && player.name.trim()).length > 18;
+          return this.players.filter(player => player.name && player.name.trim()).length >= this.settings.knockoutThreshold;
         },
 
         get completedMatches() {
-          const groupDone = this.groupMatches.filter(match => this.getMatchResult(match, 2).complete).length;
+          const groupDone = this.groupMatches.filter(match => this.getMatchResult(match, this.groupWinsNeeded).complete).length;
           const knockoutDone = this.knockoutRounds.reduce((total, round) => total + round.matches.filter(match => {
             const result = this.getKnockoutMatchResult(match);
             return result.complete && !result.bye;
@@ -531,7 +644,7 @@
           if ((this.groups.length || this.knockoutRounds.length) && !window.confirm('Wykonać nowe losowanie? Dotychczasowe grupy, drabinka i wyniki zostaną zastąpione.')) return;
           this.clearDrawData();
           const roster = this.players.filter(player => player.name && player.name.trim());
-          if (roster.length > 18) {
+          if (this.groupPlan.mode === 'knockout') {
             this.generateDirectKnockout(roster);
           } else {
             this.createGroups(roster);
@@ -557,7 +670,7 @@
                   groupId: group.id,
                   player1Id: group.playerIds[i],
                   player2Id: group.playerIds[j],
-                  sets: this.makeEmptySets(3)
+                  sets: this.makeEmptySets(this.groupMaxSets)
                 });
               }
             }
@@ -588,7 +701,7 @@
             roundIndex: 0,
             side1: pair.player1 ? { type: 'player', playerId: pair.player1.id } : null,
             side2: pair.player2 ? { type: 'player', playerId: pair.player2.id } : null,
-            sets: this.makeEmptySets(3)
+            sets: this.makeEmptySets(this.knockoutMaxSets)
           }));
 
           const rounds = [{
@@ -609,7 +722,7 @@
                 roundIndex,
                 side1: { type: 'winner', matchId: previous[index].id },
                 side2: { type: 'winner', matchId: previous[index + 1].id },
-                sets: this.makeEmptySets(3)
+                sets: this.makeEmptySets(this.knockoutMaxSets)
               });
             }
             remainingSlots /= 2;
@@ -694,7 +807,7 @@
             });
           });
           this.getGroupMatches(groupId).forEach(match => {
-            const result = this.getMatchResult(match, 2);
+            const result = this.getMatchResult(match, this.groupWinsNeeded);
             if (!result.complete) return;
             const one = stats.get(match.player1Id);
             const two = stats.get(match.player2Id);
@@ -716,7 +829,7 @@
 
         isGroupComplete(groupId) {
           const matches = this.getGroupMatches(groupId);
-          return matches.length > 0 && matches.every(match => this.getMatchResult(match, 2).complete);
+          return matches.length > 0 && matches.every(match => this.getMatchResult(match, this.groupWinsNeeded).complete);
         },
 
         get allMatchesCount() {
@@ -774,7 +887,7 @@
               roundIndex: 0,
               side1: slots[index],
               side2: slots[index + 1],
-              sets: this.makeEmptySets(3)
+              sets: this.makeEmptySets(this.knockoutMaxSets)
             });
           }
           const rounds = [{ id: this.makeId(), title: this.roundTitle(size), matches: firstMatches }];
@@ -791,7 +904,7 @@
                 roundIndex,
                 side1: { type: 'winner', matchId: previous[index].id },
                 side2: { type: 'winner', matchId: previous[index + 1].id },
-                sets: this.makeEmptySets(3)
+                sets: this.makeEmptySets(this.knockoutMaxSets)
               });
             }
             remainingSlots = remainingSlots / 2;
@@ -866,7 +979,7 @@
           if (one.playerId && !two.playerId) return { ready: true, complete: true, bye: true, winnerPlayerId: one.playerId, winnerSide: 1 };
           if (!one.playerId && two.playerId) return { ready: true, complete: true, bye: true, winnerPlayerId: two.playerId, winnerSide: 2 };
           if (!one.playerId || !two.playerId) return { ready: true, complete: false, bye: false, winnerPlayerId: null };
-          const result = this.getMatchResult({ ...match, player1Id: one.playerId, player2Id: two.playerId }, 2);
+          const result = this.getMatchResult({ ...match, player1Id: one.playerId, player2Id: two.playerId }, this.knockoutWinsNeeded);
           return { ...result, ready: true, bye: false, winnerPlayerId: result.complete ? (result.winnerSide === 1 ? one.playerId : two.playerId) : null };
         },
 
@@ -941,6 +1054,8 @@
             if (response.status === 404) {
               this.dataMissing = true;
               this.players = [];
+              this.settings = this.normalizeSettings({});
+              this.settingsDraft = { ...this.settings };
               this.groups = [];
               this.groupMatches = [];
               this.knockoutRounds = [];
@@ -982,17 +1097,19 @@
         },
 
         applyData(data) {
+          this.settings = this.normalizeSettings(data.settings || {});
+          this.settingsDraft = { ...this.settings };
           this.players = Array.isArray(data.players) ? data.players : [];
           this.groups = Array.isArray(data.groups) ? data.groups : [];
           this.groupMatches = Array.isArray(data.groupMatches) ? data.groupMatches.map(match => ({
             ...match,
-            sets: Array.isArray(match.sets) ? [...match.sets, ...this.makeEmptySets(Math.max(0, 3 - match.sets.length))].slice(0, 3) : this.makeEmptySets(3)
+            sets: Array.isArray(match.sets) ? [...match.sets, ...this.makeEmptySets(Math.max(0, this.groupMaxSets - match.sets.length))].slice(0, this.groupMaxSets) : this.makeEmptySets(this.groupMaxSets)
           })) : [];
           this.knockoutRounds = Array.isArray(data.knockoutRounds) ? data.knockoutRounds.map(round => ({
             ...round,
             matches: Array.isArray(round.matches) ? round.matches.map(match => ({
               ...match,
-              sets: Array.isArray(match.sets) ? [...match.sets, ...this.makeEmptySets(Math.max(0, 3 - match.sets.length))].slice(0, 3) : this.makeEmptySets(3)
+              sets: Array.isArray(match.sets) ? [...match.sets, ...this.makeEmptySets(Math.max(0, this.knockoutMaxSets - match.sets.length))].slice(0, this.knockoutMaxSets) : this.makeEmptySets(this.knockoutMaxSets)
             })) : []
           })) : [];
           this.qualifiersAtDraw = Array.isArray(data.qualifiersAtDraw) ? data.qualifiersAtDraw : [];
@@ -1003,6 +1120,7 @@
             tournamentType: 'darts',
             schemaVersion: 1,
             updatedAt: new Date().toISOString(),
+            settings: this.settings,
             players: this.players,
             groups: this.groups,
             groupMatches: this.groupMatches,
